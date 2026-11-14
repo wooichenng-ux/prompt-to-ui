@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/@tailwindcss/browser/dist/index.global.js','public/tailwind-browser.js')\""
+    "postinstall": "node -e \"const fs=require('fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('node_modules/@tailwindcss/browser/dist/index.global.js','public/tailwind-browser.js')\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
