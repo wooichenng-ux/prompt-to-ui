@@ -7,6 +7,25 @@ export const maxDuration = 120;
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 
+// Basic per-IP limit so a public URL can't drain the API budget. It is held in memory,
+// so on serverless hosts it applies per running instance — use a shared store for a hard cap.
+const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 10;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const hits = new Map<string, number[]>();
+
+function rateLimited(ip: string): boolean {
+  const now = Date.now();
+  const recent = (hits.get(ip) ?? []).filter((time) => now - time < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX) {
+    hits.set(ip, recent);
+    return true;
+  }
+  recent.push(now);
+  hits.set(ip, recent);
+  if (hits.size > 5000) hits.clear();
+  return false;
+}
+
 function fail(error: string, status: number) {
   return NextResponse.json({ error }, { status });
 }
@@ -26,6 +45,11 @@ export async function POST(request: Request) {
   }
   if (!process.env.ANTHROPIC_API_KEY) {
     return fail("ANTHROPIC_API_KEY is not set. Add it to .env.local and restart the server.", 500);
+  }
+
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local";
+  if (rateLimited(ip)) {
+    return fail("You've hit the generation limit. Try again in a few minutes.", 429);
   }
 
   // The key is read from the environment on the server and never reaches the browser.

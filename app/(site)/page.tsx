@@ -2,7 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useRef, useState } from "react";
 import { CodePanel } from "@/components/CodePanel";
-import { PreviewPanel } from "@/components/PreviewPanel";
+import { PreviewMode, PreviewPanel } from "@/components/PreviewPanel";
 import { CodeSkeleton, PreviewSkeleton } from "@/components/Skeletons";
 import { MAX_PROMPT_LENGTH } from "@/lib/prompt";
 
@@ -22,6 +22,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [tab, setTab] = useState<"code" | "preview">("preview");
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const abort = useRef<AbortController | null>(null);
 
   async function generate(text: string) {
@@ -183,8 +184,27 @@ export default function Home() {
               <Panel title="Code" hidden={tab !== "code"}>
                 {loading ? <CodeSkeleton /> : <CodePanel code={code} />}
               </Panel>
-              <Panel title="Preview" hidden={tab !== "preview"}>
-                {loading ? <PreviewSkeleton /> : <PreviewPanel code={code} />}
+              <Panel
+                title="Preview"
+                hidden={tab !== "preview"}
+                actions={
+                  <div className="flex gap-0.5 rounded-md border border-white/10 p-0.5" role="group" aria-label="Preview size">
+                    {(["desktop", "mobile"] as const).map((name) => (
+                      <button
+                        key={name}
+                        aria-pressed={previewMode === name}
+                        onClick={() => setPreviewMode(name)}
+                        className={`rounded px-2 py-0.5 text-[11px] font-medium capitalize transition focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
+                          previewMode === name ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-200"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                }
+              >
+                {loading ? <PreviewSkeleton /> : <PreviewPanel code={code} mode={previewMode} />}
               </Panel>
             </div>
           </section>
@@ -194,7 +214,17 @@ export default function Home() {
   );
 }
 
-function Panel({ title, hidden, children }: { title: string; hidden: boolean; children: React.ReactNode }) {
+function Panel({
+  title,
+  hidden,
+  actions,
+  children,
+}: {
+  title: string;
+  hidden: boolean;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div
       className={`min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#011627] lg:flex ${
@@ -206,6 +236,7 @@ function Panel({ title, hidden, children }: { title: string; hidden: boolean; ch
         <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
         <span className="ml-2 text-xs font-medium uppercase tracking-wider text-zinc-400">{title}</span>
+        {actions && <div className="ml-auto">{actions}</div>}
       </div>
       <div className="min-h-0 flex-1">{children}</div>
     </div>
