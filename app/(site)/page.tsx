@@ -1,10 +1,12 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { CodePanel } from "@/components/CodePanel";
 import { PreviewMode, PreviewPanel } from "@/components/PreviewPanel";
 import { CodeSkeleton, PreviewSkeleton } from "@/components/Skeletons";
+import { TrialLimitModal } from "@/components/TrialLimitModal";
 import { MAX_PROMPT_LENGTH } from "@/lib/prompt";
+import { FREE_GENERATIONS, readGenerationCount, writeGenerationCount } from "@/lib/trial";
 
 const examples = [
   "A dark mode pricing table",
@@ -23,11 +25,28 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [tab, setTab] = useState<"code" | "preview">("preview");
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
+  // null until the saved count has been read from localStorage after mount.
+  const [generations, setGenerations] = useState<number | null>(null);
+  const [limitOpen, setLimitOpen] = useState(false);
+  const closeLimit = useCallback(() => setLimitOpen(false), []);
   const abort = useRef<AbortController | null>(null);
+
+  useEffect(() => setGenerations(readGenerationCount()), []);
 
   async function generate(text: string) {
     const value = text.trim();
     if (!value) return;
+
+    // Metered trial: read the stored count directly so other tabs are counted too.
+    const used = readGenerationCount();
+    if (used >= FREE_GENERATIONS) {
+      setGenerations(used);
+      setLimitOpen(true);
+      return;
+    }
+    writeGenerationCount(used + 1);
+    setGenerations(used + 1);
+
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
@@ -65,6 +84,7 @@ export default function Home() {
 
   const loading = status === "loading";
   const showWorkspace = loading || Boolean(code);
+  const remaining = Math.max(0, FREE_GENERATIONS - (generations ?? 0));
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-zinc-950 text-zinc-100">
@@ -117,7 +137,13 @@ export default function Home() {
               className="block w-full resize-none bg-transparent px-3 py-2 text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
             />
             <div className="flex items-center justify-between gap-3 px-1 pb-1">
-              <span className="hidden pl-2 text-xs text-zinc-500 sm:block">⌘/Ctrl + Enter to generate</span>
+              <span className="pl-2 text-xs text-zinc-500">
+                {generations === null
+                  ? ""
+                  : remaining > 0
+                    ? `${remaining} of ${FREE_GENERATIONS} free generations left`
+                    : "Free generations used"}
+              </span>
               <button
                 type="submit"
                 disabled={loading || !prompt.trim()}
@@ -210,6 +236,7 @@ export default function Home() {
           </section>
         )}
       </div>
+      <TrialLimitModal open={limitOpen} onClose={closeLimit} />
     </main>
   );
 }

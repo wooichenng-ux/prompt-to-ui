@@ -1,18 +1,26 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { submitBetaSignup } from "@/lib/beta-signup";
 
 const mono = "font-[family-name:var(--font-mono)]";
 
 export function WaitlistForm({ id }: { id: string }) {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  function onSubmit(event: FormEvent) {
+  async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    // Painted door: no backend yet. Log so signups can be verified locally.
+    // Painted door: always log so signups can be verified locally.
     console.log("[waitlist] signup:", email.trim());
-    setSubmitted(true);
+    // Also goes to Formspree when NEXT_PUBLIC_FORMSPREE_ENDPOINT is set.
+    try {
+      await submitBetaSignup(email.trim(), "waitlist-page");
+      setSubmitted(true);
+    } catch {
+      setFailed(true);
+    }
   }
 
   if (submitted) {
@@ -34,7 +42,7 @@ export function WaitlistForm({ id }: { id: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-2 sm:flex-row">
+    <form onSubmit={onSubmit} className="flex flex-col flex-wrap gap-2 sm:flex-row">
       <label htmlFor={id} className="sr-only">
         Email address
       </label>
@@ -54,6 +62,11 @@ export function WaitlistForm({ id }: { id: string }) {
       >
         Join the Private Beta
       </button>
+      {failed && (
+        <p role="alert" className="w-full text-sm text-red-300">
+          That didn&apos;t go through. Please try again.
+        </p>
+      )}
     </form>
   );
 }
